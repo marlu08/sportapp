@@ -12,7 +12,7 @@ global.structuredClone=global.structuredClone||(o=>JSON.parse(JSON.stringify(o))
 global.confirm=()=>true;global.prompt=()=>'Test';global.alert=m=>{throw new Error('alert: '+m)};
 global.setInterval=()=>0;global.scrollTo=()=>{};window.scrollTo=()=>{};
 let failed=0;console.assert=(c,m)=>{if(!c){failed++;console.error('ASSERT FAIL:',m)}};
-const run=new Function(src+'\n;return {get S(){return S},go,startWorkout,logSet,delSet,finishWorkout,addVar,delVar,exDone,startRest,restPause,startStretch,srNext,srPause,logRun,newPlan,addGroup,addEx,delEx,render,exportData,monthCounts,today,calendar,addPlanItem,delPlanItem,exportIcs,toggleMenu,weekDates,ymd,strength,stats}');
+const run=new Function(src+'\n;return {get S(){return S},go,startWorkout,logSet,delSet,finishWorkout,addVar,delVar,exDone,startRest,restPause,startStretch,srNext,srPause,logRun,newPlan,addGroup,addEx,delEx,render,exportData,monthCounts,today,calendar,addPlanItem,delPlanItem,exportIcs,toggleMenu,weekDates,ymd,strength,stats,get statSel(){return statSel}}');
 const A=run();
 // Gym-Flow (Übung -> Variante)
 A.go('gym');A.startWorkout(0);
@@ -35,9 +35,18 @@ console.assert(A.S.log[0].sets.length===1&&A.S.log[0].sets[0].g==='Beine'&&A.S.l
 // Workout 2: 110×5 + 90×5 -> Ø 100×5 = gleich wie Workout 1 (100×5); Workout 3: 3× 110×5 -> +10 %
 A.startWorkout(0);document.getElementById('kg0-0-0').value='110';A.logSet(0,0,0);document.getElementById('kg0-0-0').value='90';A.logSet(0,0,0);A.finishWorkout();
 A.startWorkout(0);document.getElementById('kg0-0-0').value='110';A.logSet(0,0,0);A.logSet(0,0,0);A.logSet(0,0,0);A.finishWorkout();
-const st=A.strength().Beine;console.assert(st.length===3&&st[0].v===100&&Math.round(st[1].v)===100&&Math.round(st[2].v)===110,'kraft Ø % '+JSON.stringify(st));
+const st=A.strength().Beine[K];console.assert(st.length===3&&st[0].v===100&&Math.round(st[1].v)===100&&Math.round(st[2].v)===110,'kraft Ø % '+JSON.stringify(st));
 const sh=A.stats();console.assert(sh.includes('↑ +10 %')&&sh.includes('<svg')&&sh.indexOf('Kniebeuge')<sh.indexOf('Kreuzheben')&&sh.includes('Max 110 kg × 5'),'stats screen');
-A.S.log.splice(1,2);console.assert(A.S.log.length===1&&A.S.screen==='home','log+home');
+// 2. Variante -> eigene Linie, per Dropdown wählbar
+A.startWorkout(0);document.getElementById('kg0-0-1').value='50';document.getElementById('r0-0-1').value='8';A.logSet(0,0,1);A.finishWorkout();
+const K2='Kniebeuge · Smith Machine';console.assert(A.strength().Beine[K2][0].v===100&&A.strength().Beine[K].length===3,'varianten getrennt');
+console.assert(A.stats().includes('Max 110 kg × 5')&&!A.stats().includes('Max 50 kg'),'default erste variante');
+A.statSel.Beine=K2;console.assert(A.stats().includes('Max 50 kg × 8')&&A.stats().includes(K2+'</option>'),'dropdown wählt variante');A.S.log.pop();
+A.S.log.splice(1,2);
+// Tag nachträglich setzen: landet im Log mit dem Datum und im Graphen chronologisch vorne
+A.startWorkout(0);console.assert(document.getElementById('app').innerHTML.includes('type="date" value="'+A.today()+'"'),'datum default heute');
+A.S.activeWorkout.date='2020-01-01';A.logSet(0,0,0);A.finishWorkout();
+console.assert(A.S.log.at(-1).date==='2020-01-01'&&A.strength().Beine[K][0].d==='2020-01-01','workout mit datum');A.S.log.pop();console.assert(A.S.log.length===1&&A.S.screen==='home','log+home');
 A.startWorkout(1);console.assert(document.getElementById('app').innerHTML.includes('Smith Machine'),'Push Varianten sichtbar');A.S.activeWorkout=null;
 // Plan-Editor
 A.newPlan();A.addGroup();A.addEx(0,'__new');A.addEx(0,'Kniebeuge');

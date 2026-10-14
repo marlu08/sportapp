@@ -183,6 +183,7 @@ const exDone=e=>e.variants.some(v=>(S.activeWorkout.sets[vk(e.name,v)]||[]).leng
 function workout(){
   const p=S.activeWorkout.plan;
   return hdr(p.name,'gym')+`
+  <div class="row" style="margin-bottom:8px"><span class="mut" style="flex:0 0 auto">Tag</span><input type="date" value="${S.activeWorkout.date||today()}" max="${today()}" onchange="S.activeWorkout.date=this.value;save()"></div>
   <div class="row"><span class="mut" style="flex:0 0 auto">Pause</span>${[60,90,120,180].map(s=>`<button class="${S.restSec===s?'p':''}" onclick="S.restSec=${s};save();render()">${s}s</button>`).join('')}</div>
   ${p.groups.map(g=>`<h2 style="font-size:18px;margin:20px 0 4px">${esc(g.name)} <span class="mut">${g.exercises.filter(exDone).length}/${g.exercises.length}</span></h2>`+
     g.exercises.map((e,ei)=>{const gi=p.groups.indexOf(g);return `<details open class="ex${exDone(e)?' done':''}"><summary><b>${esc(e.name)}</b>${exDone(e)?' ✓':''}</summary>
@@ -213,7 +214,7 @@ function finishWorkout(){
   const w=S.activeWorkout,sets=[];
   w.plan.groups.forEach(g=>g.exercises.forEach(e=>e.variants.forEach(v=>(w.sets[vk(e.name,v)]||[]).forEach(x=>sets.push({g:g.name,e:e.name,v,kg:x.kg,reps:x.reps})))));
   Object.entries(w.sets).forEach(([k,s])=>{if(s.length)S.lastSets[k]=s});
-  S.log.push({type:'gym',date:today(),name:w.plan.name,sets});
+  S.log.push({type:'gym',date:w.date||today(),name:w.plan.name,sets});
   S.activeWorkout=null;S.rest=null;go('home');
 }
 function cancelWorkout(){if(confirm('Workout verwerfen?')){S.activeWorkout=null;S.rest=null;go('gym')}}
@@ -321,13 +322,12 @@ function history(){
 // ===== Statistik =====
 const score=x=>x.kg?x.kg*(1+x.reps/30):x.reps; // Epley-1RM; ohne Gewicht zählen Wdh
 function strength(){
-  // pro Workout & Muskelgruppe: Ø über Übungen von (Ø aller Sätze / Ø beim ersten Mal dieser Übung·Variante) in %
-  // ponytail: neue Übung startet bei 100 % und zieht den Gruppenschnitt Richtung 100; reicht für den Trend
+  // {Gruppe: {"Übung · Variante": [{d,v}]}}, v = Ø aller Sätze dieses Workouts / Ø beim ersten Mal in %
   const first={},grp={};
-  S.log.filter(l=>l.sets).forEach(l=>{const sc={},g={},pts={};
-    l.sets.forEach(x=>{const k=vk(x.e,x.v);(sc[k]=sc[k]||[]).push(score(x));g[k]=x.g});
-    Object.entries(sc).forEach(([k,a])=>{const b=a.reduce((s,x)=>s+x,0)/a.length;first[k]=first[k]||b;(pts[g[k]]=pts[g[k]]||[]).push(b/first[k]*100)});
-    Object.entries(pts).forEach(([gn,a])=>(grp[gn]=grp[gn]||[]).push({d:l.date,v:a.reduce((s,x)=>s+x,0)/a.length}))});
+  S.log.filter(l=>l.sets).sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{const sc={};
+    l.sets.forEach(x=>{const k=vk(x.e,x.v);(sc[k]=sc[k]||{g:x.g,a:[]}).a.push(score(x))});
+    Object.entries(sc).forEach(([k,{g,a}])=>{const b=a.reduce((s,x)=>s+x,0)/a.length;first[k]=first[k]||b;
+      ((grp[g]=grp[g]||{})[k]=grp[g][k]||[]).push({d:l.date,v:b/first[k]*100})})});
   return grp;
 }
 function chart(p){
@@ -339,6 +339,7 @@ function chart(p){
     ${p.map((x,i)=>`<circle cx="${X(i)}" cy="${Y(x.v)}" r="4" fill="#eee"/>`).join('')}</svg>
     <div class="row mut"><span>${p[0].d.slice(8)}.${p[0].d.slice(5,7)}.</span><span style="text-align:right">${p.at(-1).d.slice(8)}.${p.at(-1).d.slice(5,7)}.</span></div>`;
 }
+let statSel={}; // Gruppe -> gewählte "Übung · Variante" im Dropdown
 function stats(){
   const cnt={};S.gymPlans.forEach(p=>p.groups.forEach(g=>g.exercises.forEach(e=>cnt[e.name]=0)));
   S.log.forEach(l=>(l.sets||[]).forEach(x=>cnt[x.e]=(cnt[x.e]||0)+1));
@@ -349,8 +350,10 @@ function stats(){
     <div style="height:4px;border-radius:2px;background:#666;width:${c/max*100}%;margin-bottom:4px"></div>`).join('')||'<span class="mut">Keine Übungen</span>'}</div>
   <h2 style="font-size:18px;margin-top:24px">Kraft nach Muskelgruppe</h2>
   <p class="mut">Ø aller Sätze (geschätztes 1RM) im Vergleich zum ersten Mal = 100 %.</p>
-  ${grp.length?grp.map(([g,p])=>{const d=Math.round(p.at(-1).v-100);return `<div class="card"><div class="row"><b>${esc(g)}</b><span style="text-align:right">${d>0?'↑ +':d<0?'↓ ':'→ '}${d} %</span></div>${chart(p)}
-    ${Object.entries(mx[g]||{}).map(([k,x])=>`<div class="day"><span style="flex:1">${esc(k)}</span><span class="mut">Max ${x.kg?x.kg+' kg × '+x.reps:x.reps+' Wdh'}</span></div>`).join('')}</div>`}).join(''):'<p class="mut">Noch keine Workouts mit Sätzen gespeichert.</p>'}`;
+  ${grp.length?grp.map(([g,ser])=>{const ks=Object.keys(ser),k=ks.includes(statSel[g])?statSel[g]:ks[0],p=ser[k],d=Math.round(p.at(-1).v-100),x=mx[g][k];
+    return `<div class="card"><b>${esc(g)}</b>
+    <select style="margin-top:8px" data-g="${esc(g)}" onchange="statSel[this.dataset.g]=this.value;render()">${ks.map(o=>`<option${o===k?' selected':''}>${esc(o)}</option>`).join('')}</select>
+    <div class="row" style="margin-top:8px"><span class="mut">Max ${x.kg?x.kg+' kg × '+x.reps:x.reps+' Wdh'}</span><span style="text-align:right">${d>0?'↑ +':d<0?'↓ ':'→ '}${d} %</span></div>${chart(p)}</div>`}).join(''):'<p class="mut">Noch keine Workouts mit Sätzen gespeichert.</p>'}`;
 }
 function delLog(i){S.log.splice(i,1);save();render()}
 function settings(){
