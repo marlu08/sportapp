@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#111111">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Sportapp</title>
+<style>
+:root{--bg:#000;--card:#1a1a1a;--fg:#eee;--mut:#888;--acc:#3a3a40;--red:#f87171}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.4 -apple-system,system-ui,sans-serif;padding:env(safe-area-inset-top) 16px calc(100px + env(safe-area-inset-bottom));max-width:600px;margin:0 auto}
+h1{font-size:22px;margin:12px 0}
+header{display:flex;align-items:center;gap:4px;padding:8px 48px 8px 0}
+.back{font-size:34px;line-height:1;background:none;border:0;color:var(--fg);padding:0 12px 4px 0;min-height:0}
+button{font:inherit;background:var(--card);color:var(--fg);border:0;border-radius:12px;padding:12px 16px;min-height:44px;cursor:pointer}
+button.p{background:var(--acc);color:#fff;font-weight:600;border:1px solid #555}
+button.d{color:var(--red)}
+button.s{padding:6px 10px;min-height:32px;font-size:14px}
+input,select,textarea{font:inherit;background:#000;color:var(--fg);border:1px solid #333;border-radius:10px;padding:10px;width:100%;min-width:0}
+.card{background:var(--card);border-radius:16px;padding:14px;margin:10px 0}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.ring{position:relative;width:280px;height:280px;margin:60px auto 40px;border:2px solid #fff;border-radius:50%}
+.ring button{position:absolute;width:90px;height:90px;border-radius:50%;background:#000;font-size:54px;line-height:1;padding:0;transform:translate(-50%,-50%)}
+.menu-btn{position:fixed;top:calc(8px + env(safe-area-inset-top));right:12px;z-index:10;font-size:24px;padding:6px 12px;background:var(--card)}
+#menu{position:fixed;top:calc(56px + env(safe-area-inset-top));right:12px;z-index:10;background:var(--card);border:1px solid #333;border-radius:14px;padding:6px;display:flex;flex-direction:column;min-width:180px;box-shadow:0 8px 30px #000}
+#menu[hidden]{display:none}
+#menu button{background:none;text-align:left;border-radius:10px}
+.day{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:15px}
+.mut{color:var(--mut);font-size:14px}
+#bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:#1a1a1a;display:none;gap:10px;align-items:center;font-size:26px;font-variant-numeric:tabular-nums;border-top:1px solid #333}
+#bar.on{display:flex}
+.big{font-size:84px;text-align:center;font-variant-numeric:tabular-nums;margin:24px 0;line-height:1}
+details{margin:8px 0}summary{font-weight:600;padding:8px 0;font-size:18px}
+.ex{padding:10px 0;border-top:1px solid #333}
+.ex.done summary b{color:var(--mut)}
+.ex summary{font-size:17px}
+.var{padding-left:4px}
+.sets{font-size:14px;color:var(--mut);margin-top:6px}
+.sets span{margin-right:10px;white-space:nowrap}
+input[type=checkbox]{width:24px;height:24px;vertical-align:middle;margin-right:8px}
+.full{width:100%;display:block;margin-top:8px}
+</style>
+<style>.cal-head{font-weight:600;margin-bottom:6px}</style>
+</head>
+<body>
+<button class="menu-btn" onclick="toggleMenu()">☰</button>
+<div id="menu" hidden>
+  <button onclick="go('home')">🏠 Start</button>
+  <button onclick="go('gym')">🏋️ Gym</button>
+  <button onclick="go('run')">🏃 Laufen</button>
+  <button onclick="go('stretch')">🧘 Dehnen</button>
+  <button onclick="go('calendar')">📅 Kalender</button>
+  <button onclick="go('history')">📋 Verlauf</button>
+  <button onclick="go('settings')">⚙️ Einstellungen</button>
+</div>
+<div id="app"></div>
+<div id="bar"></div>
+<script>
+// ===== Daten =====
+const KEY='sportapp';
+const LIB_EXTRA=['Brustpresse Maschine','Kurzhantel Schrägbank','Rudern Kabel','Face Pulls','Wadenheben','Hip Thrust','Ausfallschritte','Hammercurls','Trizeps Kabel','Frontheben'];
+function defaults(){
+  const X=(name,...variants)=>({name,variants});
+  const gymPlans=[
+    {id:'uk',name:'UK',groups:[
+      {name:'Beine',exercises:[X('Kniebeuge','Langhantel','Smith Machine','Hackenschmidt'),X('Kreuzheben','Langhantel','Rumänisch','Trap Bar'),X('Beinstrecker','Maschine'),X('Beincurls','Maschine liegend','Maschine sitzend')]},
+      {name:'Schienbein',exercises:[X('Zehenheben','Körpergewicht','Maschine')]}]},
+    {id:'push',name:'Push',groups:[
+      {name:'Brust',exercises:[X('Schrägbankdrücken','Langhantel','Kurzhantel','Maschine','Smith Machine'),X('Dips','Zusatzgewicht','Körpergewicht','Maschine'),X('Flys','Kabel','Maschine','Kurzhantel')]},
+      {name:'Schulter',exercises:[X('Schulterdrücken','Kurzhantel','Langhantel','Maschine','Smith Machine'),X('Seitheben','Kurzhantel','Kabel','Maschine')]},
+      {name:'Trizeps',exercises:[X('Einarmige Trizepsextension','Kabel','Kurzhantel')]}]},
+    {id:'pull',name:'Pull',groups:[
+      {name:'Lat',exercises:[X('Klimmzüge','Körpergewicht','Zusatzgewicht','Unterstützt'),X('Latzug','Breit','Eng','Einarmig'),X('Rudern','Kabel breit','Langhantel','Maschine','T-Bar')]},
+      {name:'Bizeps',exercises:[X('Bizepscurls','Langhantel','Kurzhantel','Kabel','Maschine')]}]}
+  ];
+  const runPlans=[
+    {id:'z2',name:'Zone 2',note:'Locker, Nasenatmung, 45–60 min'},
+    {id:'fun',name:'Spaßrun',note:'Ohne Plan, nach Gefühl'},
+    {id:'int',name:'Intervall',note:'z.B. 6× 3 min schnell / 2 min Trab'}
+  ];
+  const stretchRoutines=[{id:'std',name:'Standard',steps:['Kniesitz','Knie nach hinten lehnen','Katze-Kuh','Katzenbuckel','Handtuch Schultermobilisation'].map(name=>({name,seconds:60}))}];
+  const exerciseLibrary=[...new Set([...gymPlans.flatMap(p=>p.groups.flatMap(g=>g.exercises.map(e=>e.name))),...LIB_EXTRA])];
+  return {gymPlans,runPlans,stretchRoutines,exerciseLibrary,lastSets:{},activeWorkout:null,rest:null,restSec:90,sr:null,log:[],plan:{},screen:'home',edit:null};
+}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(!s||!s.gymPlans)return null;const d={...defaults(),...s};
+  // ponytail: Migration v1->v2 = Pläne auf Default zurücksetzen (Strings statt {name,variants}); echte Migration erst wenn jemand Daten hat
+  if(d.gymPlans.some(p=>p.groups.some(g=>g.exercises.some(e=>typeof e==='string')))){d.gymPlans=defaults().gymPlans;d.lastSets={};d.activeWorkout=null;if(['workout','gymEdit'].includes(d.screen))d.screen='gym'}
+  return d}catch(e){return null}}
+let S=load()||defaults();
+const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const today=()=>ymd(new Date());
+const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return Math.floor(s/60)+':'+pad(s%60)};
+const hdr=(t,b)=>`<header><button class="back" onclick="go('${b}')">‹</button><h1>${esc(t)}</h1></header>`;
+function monthCounts(ym){const c={gym:0,run:0,stretch:0};S.log.forEach(l=>{if(l.date.startsWith(ym))c[l.type]++});return c}
+
+// ===== Navigation =====
+function toggleMenu(){const m=document.getElementById('menu');m.hidden=!m.hidden}
+function go(screen,edit){document.getElementById('menu').hidden=true;S.screen=screen;S.edit=edit??null;save();render();window.scrollTo(0,0)}
+function render(){
+  if(S.screen==='workout'&&!S.activeWorkout)S.screen='gym';
+  if(S.screen==='stretchRun'&&!S.sr)S.screen='stretch';
+  if(S.screen==='gymEdit'&&!S.gymPlans[S.edit])S.screen='gym';
+  if(S.screen==='stretchEdit'&&!S.stretchRoutines[S.edit])S.screen='stretch';
+  const R={home,gym,gymEdit,workout,run,stretch,stretchEdit,stretchRun,history,settings,calendar};
+  document.getElementById('app').innerHTML=(R[S.screen]||home)();
+  renderBar();
+}
+
+// ===== Home =====
+function home(){
+  const ym=today().slice(0,7),c=monthCounts(ym);
+  return `${S.activeWorkout?`<div class="card row" style="margin-top:56px"><span>🏋️ Workout läuft: ${esc(S.activeWorkout.plan.name)}</span><button class="p" style="flex:0" onclick="go('workout')">Weiter</button></div>`:''}
+  <div class="ring">
+    <button style="left:50%;top:0" onclick="go('gym')">🏋️</button>
+    <button style="left:6.7%;top:75%" onclick="go('run')">🏃</button>
+    <button style="left:93.3%;top:75%" onclick="go('stretch')">🧘</button>
+  </div>
+  <div class="mut" style="text-align:center">${new Date().toLocaleDateString('de',{month:'long'})}: 🏋️ ${c.gym} · 🏃 ${c.run} · 🧘 ${c.stretch}</div>`;
+}
+
+// ===== Gym: Pläne =====
+const VARIANTS=['Langhantel','Kurzhantel','Maschine','Smith Machine','Kabel','Körpergewicht','Zusatzgewicht'];
+const allVariants=()=>[...new Set([...VARIANTS,...S.gymPlans.flatMap(p=>p.groups.flatMap(g=>g.exercises.flatMap(e=>e.variants)))])];
+const vk=(ex,v)=>ex+' · '+v;
+function gym(){
+  return hdr('Gym','home')+
+  (S.activeWorkout?`<div class="card row"><span>Workout läuft: ${esc(S.activeWorkout.plan.name)}</span><button class="p" style="flex:0" onclick="go('workout')">Weiter</button></div>`:'')+
+  S.gymPlans.map((p,i)=>`<div class="card"><b>${esc(p.name)}</b><div class="mut">${p.groups.map(g=>esc(g.name)).join(' · ')||'leer'}</div>
+    <div class="row" style="margin-top:8px"><button class="p" onclick="startWorkout(${i})">Start</button><button onclick="go('gymEdit',${i})">Bearbeiten</button></div></div>`).join('')+
+  `<button class="full" onclick="newPlan()">+ Neuer Plan</button>`;
+}
+const curPlan=()=>S.gymPlans[S.edit];
+function gymEdit(){
+  const p=curPlan();
+  const sel=(list,extra)=>list.slice().sort((a,b)=>a.localeCompare(b,'de')).map(e=>`<option>${esc(e)}</option>`).join('')+`<option value="__new">✏️ ${extra}</option>`;
+  const exOpts=sel(S.exerciseLibrary,'Neue Übung eingeben'),vOpts=sel(allVariants(),'Neue Variante eingeben');
+  return hdr('Plan bearbeiten','gym')+`
+  <input value="${esc(p.name)}" placeholder="Planname" onchange="curPlan().name=this.value;save()">
+  ${p.groups.map((g,gi)=>`<div class="card">
+    <div class="row"><input value="${esc(g.name)}" placeholder="Muskelgruppe" onchange="curPlan().groups[${gi}].name=this.value;save()"><button class="s d" style="flex:0" onclick="delGroup(${gi})">✕</button></div>
+    ${g.exercises.map((e,ei)=>`<details style="margin:8px 0 0 4px"><summary>${esc(e.name)} <span class="mut">${e.variants.length} Varianten</span></summary>
+      ${e.variants.map((v,vi)=>`<div class="row" style="margin-top:4px"><span class="mut">↳ ${esc(v)}</span><button class="s d" style="flex:0" onclick="delVar(${gi},${ei},${vi})">✕</button></div>`).join('')}
+      <select style="margin-top:6px" onchange="addVar(${gi},${ei},this.value)"><option value="">+ Variante…</option>${vOpts}</select>
+      <button class="s d" style="margin-top:6px" onclick="delEx(${gi},${ei})">Übung entfernen</button>
+    </details>`).join('')}
+    <select style="margin-top:10px" onchange="addEx(${gi},this.value)"><option value="">+ Übung hinzufügen…</option>${exOpts}</select>
+  </div>`).join('')}
+  <button class="full" onclick="addGroup()">+ Muskelgruppe</button>
+  <button class="d full" style="margin-top:24px" onclick="delPlan()">Plan löschen</button>`;
+}
+function newPlan(){const n=prompt('Planname');if(!n)return;S.gymPlans.push({id:uid(),name:n,groups:[]});go('gymEdit',S.gymPlans.length-1)}
+function delPlan(){if(confirm('Plan wirklich löschen?')){S.gymPlans.splice(S.edit,1);go('gym')}}
+function addGroup(){const n=prompt('Muskelgruppe (z.B. Brust)');if(n){curPlan().groups.push({name:n,exercises:[]});save();render()}}
+function delGroup(gi){if(confirm('Gruppe löschen?')){curPlan().groups.splice(gi,1);save();render()}}
+function addEx(gi,v){
+  if(v==='__new')v=prompt('Übungsname');if(!v)return render();v=v.trim();
+  const g=curPlan().groups[gi];if(g.exercises.some(e=>e.name===v))return render();
+  const known=S.gymPlans.flatMap(p=>p.groups.flatMap(g=>g.exercises)).find(e=>e.name===v); // Varianten aus anderem Plan übernehmen
+  g.exercises.push({name:v,variants:known?[...known.variants]:['Standard']});
+  if(!S.exerciseLibrary.includes(v))S.exerciseLibrary.push(v);save();render();
+}
+function delEx(gi,ei){curPlan().groups[gi].exercises.splice(ei,1);save();render()}
+function addVar(gi,ei,v){if(v==='__new')v=prompt('Variante (z.B. Kurzhantel)');if(!v)return render();v=v.trim();const e=curPlan().groups[gi].exercises[ei];if(!e.variants.includes(v))e.variants.push(v);save();render()}
+function delVar(gi,ei,vi){curPlan().groups[gi].exercises[ei].variants.splice(vi,1);save();render()}
+
+// ===== Gym: Workout =====
+function startWorkout(i){
+  if(S.activeWorkout&&!confirm('Laufendes Workout verwerfen?'))return;
+  S.activeWorkout={plan:structuredClone(S.gymPlans[i]),started:Date.now(),sets:{}};
+  go('workout');
+}
+const exDone=e=>e.variants.some(v=>(S.activeWorkout.sets[vk(e.name,v)]||[]).length);
+function workout(){
+  const p=S.activeWorkout.plan;
+  return hdr(p.name,'gym')+`
+  <div class="row"><span class="mut" style="flex:0 0 auto">Pause</span>${[60,90,120,180].map(s=>`<button class="${S.restSec===s?'p':''}" onclick="S.restSec=${s};save();render()">${s}s</button>`).join('')}</div>
+  ${p.groups.map(g=>`<h2 style="font-size:18px;margin:20px 0 4px">${esc(g.name)} <span class="mut">${g.exercises.filter(exDone).length}/${g.exercises.length}</span></h2>`+
+    g.exercises.map((e,ei)=>{const gi=p.groups.indexOf(g);return `<details open class="ex${exDone(e)?' done':''}"><summary><b>${esc(e.name)}</b>${exDone(e)?' ✓':''}</summary>
+      ${e.variants.map((v,vi)=>varRow(e.name,v,gi,ei,vi)).join('')||'<div class="mut">Keine Varianten – im Plan-Editor hinzufügen</div>'}
+    </details>`}).join('')).join('')}
+  <div class="row" style="margin-top:24px"><button class="p" onclick="finishWorkout()">Workout beenden</button><button class="d" onclick="cancelWorkout()">Abbrechen</button></div>`;
+}
+function varRow(ex,v,gi,ei,vi){
+  const k=vk(ex,v),sets=S.activeWorkout.sets[k]||[],last=S.lastSets[k]||[];
+  const ref=sets[sets.length-1]||last[last.length-1]||{},id=`${gi}-${ei}-${vi}`;
+  return `<div class="var">
+    <div class="row" style="margin-top:6px"><span style="flex:1 1 80px;${sets.length?'color:var(--mut)':''}">${esc(v)}</span>
+      <input type="number" inputmode="decimal" step="0.5" placeholder="kg" id="kg${id}" value="${ref.kg??''}" style="flex:0 0 72px">
+      <input type="number" inputmode="numeric" placeholder="Wdh" id="r${id}" value="${ref.reps??''}" style="flex:0 0 62px">
+      <button class="p" style="flex:0 0 54px;padding:0;font-size:22px" onclick="logSet(${gi},${ei},${vi})">✓</button></div>
+    ${last.length||sets.length?`<div class="sets">${last.length?`Letztes Mal: ${last.map(x=>x.kg+'×'+x.reps).join(', ')}`:''}${sets.length?`${last.length?'<br>':''}Heute: ${sets.map((x,si)=>`<span>${x.kg}×${x.reps} <button class="s d" onclick="delSet(${gi},${ei},${vi},${si})">✕</button></span>`).join('')}`:''}</div>`:''}
+  </div>`;
+}
+const varKey=(gi,ei,vi)=>{const e=S.activeWorkout.plan.groups[gi].exercises[ei];return vk(e.name,e.variants[vi])};
+function logSet(gi,ei,vi){
+  const id=`${gi}-${ei}-${vi}`,kg=+document.getElementById('kg'+id).value,reps=+document.getElementById('r'+id).value;
+  if(!reps)return;
+  const k=varKey(gi,ei,vi),w=S.activeWorkout;(w.sets[k]=w.sets[k]||[]).push({kg,reps});
+  save();startRest(S.restSec);render();
+}
+function delSet(gi,ei,vi,si){S.activeWorkout.sets[varKey(gi,ei,vi)].splice(si,1);save();render()}
+function finishWorkout(){
+  const w=S.activeWorkout;
+  Object.entries(w.sets).forEach(([k,s])=>{if(s.length)S.lastSets[k]=s});
+  S.log.push({type:'gym',date:today(),name:w.plan.name});
+  S.activeWorkout=null;S.rest=null;go('home');
+}
+function cancelWorkout(){if(confirm('Workout verwerfen?')){S.activeWorkout=null;S.rest=null;go('gym')}}
+
+// ===== Pausen-Timer =====
+function renderBar(){
+  const b=document.getElementById('bar');
+  if(!S.rest){b.className='';return}
+  b.className='on';
+  b.innerHTML=`<span style="flex:1">⏱ <span id="tb-time">${fmt(S.rest.end?S.rest.end-Date.now():S.rest.left)}</span></span><button onclick="restPause()">${S.rest.end?'⏸':'▶️'}</button><button onclick="S.rest=null;save();renderBar()">✕</button>`;
+}
+function startRest(sec){audio();wake();S.rest={end:Date.now()+sec*1000,left:null};save();renderBar()}
+function restPause(){const r=S.rest;if(r.end){r.left=r.end-Date.now();r.end=null}else{r.end=Date.now()+r.left;r.left=null}save();renderBar()}
+
+// ===== Laufen =====
+function run(){
+  return hdr('Laufen','home')+S.runPlans.map((p,i)=>`<div class="card">
+    <div class="row"><input value="${esc(p.name)}" onchange="S.runPlans[${i}].name=this.value;save()"><button class="s d" style="flex:0" onclick="delRun(${i})">✕</button></div>
+    <textarea rows="2" placeholder="Notiz / Plan" style="margin-top:8px" onchange="S.runPlans[${i}].note=this.value;save()">${esc(p.note||'')}</textarea>
+    <button class="p full" onclick="logRun(${i})">✓ Heute gelaufen</button></div>`).join('')+
+  `<button class="full" onclick="newRun()">+ Neuer Laufplan</button>`;
+}
+function logRun(i){const m=prompt('Minuten (optional)','');if(m===null)return;S.log.push({type:'run',date:today(),name:S.runPlans[i].name,min:+m||undefined});go('home')}
+function newRun(){const n=prompt('Name (z.B. Tempolauf)');if(n){S.runPlans.push({id:uid(),name:n,note:''});save();render()}}
+function delRun(i){if(confirm('Löschen?')){S.runPlans.splice(i,1);save();render()}}
+
+// ===== Dehnen =====
+function stretch(){
+  return hdr('Dehnen','home')+S.stretchRoutines.map((r,i)=>`<div class="card"><b>${esc(r.name)}</b><div class="mut">${r.steps.length} Schritte · ${Math.round(r.steps.reduce((a,s)=>a+s.seconds,0)/60)} min</div>
+    <div class="row" style="margin-top:8px"><button class="p" onclick="startStretch(${i})">Start</button><button onclick="go('stretchEdit',${i})">Bearbeiten</button></div></div>`).join('')+
+  `<button class="full" onclick="newStretch()">+ Neue Routine</button>`;
+}
+const curRoutine=()=>S.stretchRoutines[S.edit];
+function stretchEdit(){
+  const r=curRoutine();
+  return hdr('Routine bearbeiten','stretch')+`
+  <input value="${esc(r.name)}" onchange="curRoutine().name=this.value;save()">
+  ${r.steps.map((s,si)=>`<div class="row" style="margin-top:8px"><input value="${esc(s.name)}" placeholder="Übung" onchange="curRoutine().steps[${si}].name=this.value;save()"><input type="number" inputmode="numeric" style="flex:0 0 72px" value="${s.seconds}" onchange="curRoutine().steps[${si}].seconds=+this.value||30;save()"><button class="s d" style="flex:0" onclick="delStep(${si})">✕</button></div>`).join('')}
+  <div class="row" style="margin-top:12px"><button onclick="addStep(30)">+ Schritt 30 s</button><button onclick="addStep(60)">+ Schritt 60 s</button></div>
+  <button class="d full" style="margin-top:24px" onclick="delStretch()">Routine löschen</button>`;
+}
+function addStep(sec){const n=prompt('Übung (z.B. Katze-Kuh)');if(n){curRoutine().steps.push({name:n,seconds:sec});save();render()}}
+function delStep(si){curRoutine().steps.splice(si,1);save();render()}
+function newStretch(){const n=prompt('Name der Routine');if(n){S.stretchRoutines.push({id:uid(),name:n,steps:[]});go('stretchEdit',S.stretchRoutines.length-1)}}
+function delStretch(){if(confirm('Routine löschen?')){S.stretchRoutines.splice(S.edit,1);go('stretch')}}
+function startStretch(i){
+  const r=S.stretchRoutines[i];if(!r.steps.length)return alert('Routine hat keine Schritte');
+  audio();wake();S.sr={routine:structuredClone(r),i:0,end:Date.now()+r.steps[0].seconds*1000,left:null};go('stretchRun');
+}
+const srLeft=()=>S.sr.end?S.sr.end-Date.now():S.sr.left;
+function stretchRun(){
+  const sr=S.sr,st=sr.routine.steps,s=st[sr.i],n=st[sr.i+1];
+  return `<header><button class="back" onclick="abortStretch()">‹</button><h1>${esc(sr.routine.name)}</h1></header>
+  <div class="mut" style="text-align:center">Schritt ${sr.i+1} / ${st.length}</div>
+  <h1 style="text-align:center;font-size:28px">${esc(s.name)}</h1>
+  <div class="big" id="sr-time">${fmt(srLeft())}</div>
+  <div class="mut" style="text-align:center">${n?'Danach: '+esc(n.name):'Letzter Schritt'}</div>
+  <div class="row" style="margin-top:24px"><button class="p" onclick="srPause()">${sr.end?'⏸ Pause':'▶️ Weiter'}</button><button onclick="srNext()">⏭ Überspringen</button></div>
+  <button class="d full" style="margin-top:24px" onclick="abortStretch()">Abbrechen</button>`;
+}
+function srPause(){const sr=S.sr;if(sr.end){sr.left=sr.end-Date.now();sr.end=null}else{sr.end=Date.now()+sr.left;sr.left=null}save();render()}
+function srNext(){
+  const sr=S.sr,st=sr.routine.steps;sr.i++;
+  if(sr.i>=st.length){S.log.push({type:'stretch',date:today(),name:sr.routine.name});S.sr=null;go('home');return}
+  sr.end=Date.now()+st[sr.i].seconds*1000;sr.left=null;save();render();
+}
+function abortStretch(){if(confirm('Routine abbrechen?')){S.sr=null;go('stretch')}}
+
+// ===== Kalender =====
+let calOff=0;
+const DAYS=['Mo','Di','Mi','Do','Fr','Sa','So'];
+const ICON={gym:'🏋️',run:'🏃',stretch:'🧘'};
+function weekDates(){const d=new Date();d.setDate(d.getDate()-(d.getDay()+6)%7+calOff*7);return [...Array(7)].map((_,i)=>{const x=new Date(d);x.setDate(d.getDate()+i);return x})}
+function calendar(){
+  const days=weekDates();
+  const opt=(t,list)=>`<optgroup label="${ICON[t]} ${t==='gym'?'Gym':t==='run'?'Laufen':'Dehnen'}">${list.map(n=>`<option value="${t}|${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>`;
+  const opts=opt('gym',S.gymPlans.map(p=>p.name))+opt('run',S.runPlans.map(p=>p.name))+opt('stretch',S.stretchRoutines.map(r=>r.name));
+  return hdr('Kalender','home')+`
+  <div class="row"><button onclick="calOff--;render()">‹</button><span style="text-align:center">${days[0].toLocaleDateString('de',{day:'numeric',month:'short'})} – ${days[6].toLocaleDateString('de',{day:'numeric',month:'short'})}${calOff?'':' (diese Woche)'}</span><button onclick="calOff++;render()">›</button></div>
+  ${days.map((d,i)=>{const k=ymd(d),items=S.plan[k]||[],done=S.log.filter(l=>l.date===k);return `<div class="card${k===today()?' today':''}" ${k===today()?'style="border:1px solid #555"':''}>
+    <div class="cal-head">${DAYS[i]} ${d.getDate()}.${d.getMonth()+1}.</div>
+    ${items.map((it,j)=>`<div class="day"><span style="flex:1">${ICON[it.type]} ${esc(it.name)}</span><button class="s d" onclick="delPlanItem('${k}',${j})">✕</button></div>`).join('')}
+    ${done.map(l=>`<div class="day mut">✓ ${ICON[l.type]} ${esc(l.name)} erledigt</div>`).join('')}
+    <select onchange="addPlanItem('${k}',this.value)"><option value="">+ planen…</option>${opts}</select>
+  </div>`}).join('')}
+  <button class="p full" onclick="exportIcs()">📅 Woche in Kalender-App exportieren</button>`;
+}
+function addPlanItem(k,v){if(!v)return;const [type,name]=v.split('|');(S.plan[k]=S.plan[k]||[]).push({type,name});save();render()}
+function delPlanItem(k,j){S.plan[k].splice(j,1);if(!S.plan[k].length)delete S.plan[k];save();render()}
+function exportIcs(){
+  const days=weekDates().map(ymd),ev=[];
+  days.forEach(k=>(S.plan[k]||[]).forEach((it,j)=>{const n=k.replace(/-/g,''),e=new Date(k);e.setDate(e.getDate()+1);
+    ev.push(`BEGIN:VEVENT\r\nUID:${k}-${j}@sportapp\r\nDTSTAMP:${n}T000000Z\r\nDTSTART;VALUE=DATE:${n}\r\nDTEND;VALUE=DATE:${ymd(e).replace(/-/g,'')}\r\nSUMMARY:${ICON[it.type]} ${it.name}\r\nEND:VEVENT`)}));
+  if(!ev.length)return alert('Nichts geplant in dieser Woche');
+  const ics=`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Sportapp//DE\r\n${ev.join('\r\n')}\r\nEND:VCALENDAR\r\n`;
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'}));a.download='sportapp-'+days[0]+'.ics';a.click();
+}
+
+// ===== Verlauf & Einstellungen =====
+function history(){
+  const ic=ICON;
+  const l=S.log.map((e,i)=>({...e,i})).reverse().slice(0,100);
+  return hdr('Verlauf','home')+(l.length?l.map(e=>`<div class="card row"><span class="mut" style="flex:0 0 60px">${e.date.slice(8)}.${e.date.slice(5,7)}.</span><span>${ic[e.type]} ${esc(e.name)}${e.min?' · '+e.min+' min':''}</span><button class="s d" style="flex:0" onclick="delLog(${e.i})">✕</button></div>`).join(''):'<p class="mut">Noch nichts geloggt.</p>');
+}
+function delLog(i){S.log.splice(i,1);save();render()}
+function settings(){
+  return hdr('Einstellungen','home')+`<div class="card"><p class="mut">Daten liegen nur in diesem Browser. Ab und zu exportieren!</p>
+  <button class="full" onclick="exportData()">⬇️ Export (JSON)</button>
+  <label class="mut full" style="margin-top:16px">⬆️ Import<input type="file" accept=".json,application/json" style="margin-top:6px" onchange="importData(this.files[0])"></label></div>
+  <button class="d full" onclick="resetData()">Alles zurücksetzen</button>`;
+}
+function exportData(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='sportapp-'+today()+'.json';a.click()}
+function importData(f){if(!f)return;f.text().then(t=>{const d=JSON.parse(t);if(!d.gymPlans)throw 0;S={...defaults(),...d,screen:'home'};save();render()}).catch(()=>alert('Ungültige Datei'))}
+function resetData(){if(confirm('Wirklich alle Daten löschen?')){S=defaults();save();render()}}
+
+// ===== Ton, Vibration, Wake Lock =====
+let ac;
+function audio(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}}
+function beep(){
+  try{navigator.vibrate&&navigator.vibrate([200,100,200,100,200])}catch(e){}
+  if(!ac)return;
+  try{for(let i=0;i<3;i++){const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.frequency.value=880;g.gain.value=.3;o.start(ac.currentTime+i*.25);o.stop(ac.currentTime+i*.25+.15)}}catch(e){}
+}
+let wl;
+async function wake(){try{if(!wl){wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>wl=null)}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(S.rest||S.sr))wake()});
+
+// ===== Tick (Date.now()-basiert, überlebt Hintergrund) =====
+// ponytail: im iOS-Hintergrund gibt es keinen Ton; Web kann das nicht. Reicht mit Bildschirm an (Wake Lock).
+setInterval(()=>{
+  const now=Date.now();
+  if(S.rest){if(S.rest.end&&S.rest.end<=now){beep();S.rest=null;save();renderBar()}else{const t=document.getElementById('tb-time');if(t)t.textContent=fmt(S.rest.end?S.rest.end-now:S.rest.left)}}
+  if(S.sr){if(S.sr.end&&S.sr.end<=now){beep();srNext()}else{const t=document.getElementById('sr-time');if(t)t.textContent=fmt(srLeft())}}
+},250);
+
+// ===== Start =====
+render();
+if(location.protocol.startsWith('http')&&'serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+if(location.search.includes('selftest')){
+  const bak=S;S=defaults();
+  console.assert(S.gymPlans.length===3,'3 Pläne');
+  console.assert(S.exerciseLibrary.includes('Kniebeuge')&&S.exerciseLibrary.includes('Face Pulls'),'Bibliothek');
+  S.activeWorkout={plan:structuredClone(S.gymPlans[0]),sets:{'Kniebeuge · Langhantel':[{kg:100,reps:5}]}};
+  Object.entries(S.activeWorkout.sets).forEach(([e,s])=>S.lastSets[e]=s);S.log.push({type:'gym',date:today(),name:'UK'});
+  console.assert(S.lastSets['Kniebeuge · Langhantel'][0].kg===100,'lastSets');console.assert(S.gymPlans[1].groups[0].exercises[0].variants.includes('Smith Machine'),'Varianten');
+  console.assert(monthCounts(today().slice(0,7)).gym===1,'Monatszähler');
+  console.assert(fmt(90000)==='1:30'&&fmt(-5)==='0:00','fmt');
+  S=bak;console.log('selftest ok');
+}
+</script>
+</body>
+</html>
