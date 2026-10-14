@@ -12,7 +12,7 @@ global.structuredClone=global.structuredClone||(o=>JSON.parse(JSON.stringify(o))
 global.confirm=()=>true;global.prompt=()=>'Test';global.alert=m=>{throw new Error('alert: '+m)};
 global.setInterval=()=>0;global.scrollTo=()=>{};window.scrollTo=()=>{};
 let failed=0;console.assert=(c,m)=>{if(!c){failed++;console.error('ASSERT FAIL:',m)}};
-const run=new Function(src+'\n;return {get S(){return S},go,startWorkout,logSet,delSet,finishWorkout,addVar,delVar,exDone,startRest,restPause,startStretch,srNext,srPause,logRun,newPlan,addGroup,addEx,delEx,render,exportData,monthCounts,today,calendar,addPlanItem,delPlanItem,exportIcs,toggleMenu,weekDates,ymd}');
+const run=new Function(src+'\n;return {get S(){return S},go,startWorkout,logSet,delSet,finishWorkout,addVar,delVar,exDone,startRest,restPause,startStretch,srNext,srPause,logRun,newPlan,addGroup,addEx,delEx,render,exportData,monthCounts,today,calendar,addPlanItem,delPlanItem,exportIcs,toggleMenu,weekDates,ymd,strength,stats}');
 const A=run();
 // Gym-Flow (Übung -> Variante)
 A.go('gym');A.startWorkout(0);
@@ -29,7 +29,13 @@ A.delSet(0,0,0,1);console.assert(A.S.activeWorkout.sets[K].length===1,'delSet');
 A.restPause();console.assert(A.S.rest.end===null&&A.S.rest.left>0,'rest pausiert');
 const saved=JSON.parse(store.sportapp);console.assert(saved.activeWorkout.sets[K].length===1&&saved.screen==='workout','persistiert');
 A.finishWorkout();
-console.assert(A.S.lastSets[K][0].kg===100,'lastSets');console.assert(A.S.log.length===1&&A.S.screen==='home','log+home');
+console.assert(A.S.lastSets[K][0].kg===100,'lastSets');
+console.assert(A.S.log[0].sets.length===1&&A.S.log[0].sets[0].g==='Beine'&&A.S.log[0].sets[0].e==='Kniebeuge','sets im log');
+// Statistik: 2. Workout mit mehr Gewicht -> Beine steigen
+A.startWorkout(0);document.getElementById('kg0-0-0').value='110';A.logSet(0,0,0);A.logSet(0,0,0);A.finishWorkout();
+const st=A.strength().Beine;console.assert(st.length===2&&st[0].v===100&&Math.round(st[1].v)===110,'kraft % '+JSON.stringify(st));
+const sh=A.stats();console.assert(sh.includes('↑ +10 %')&&sh.includes('<svg')&&sh.indexOf('Kniebeuge')<sh.indexOf('Kreuzheben'),'stats screen');
+A.S.log.splice(1,1);console.assert(A.S.log.length===1&&A.S.screen==='home','log+home');
 A.startWorkout(1);console.assert(document.getElementById('app').innerHTML.includes('Smith Machine'),'Push Varianten sichtbar');A.S.activeWorkout=null;
 // Plan-Editor
 A.newPlan();A.addGroup();A.addEx(0,'__new');A.addEx(0,'Kniebeuge');
@@ -60,6 +66,6 @@ console.assert(JSON.parse(store.sportapp).plan[wk[2]][0].name==='Zone 2','plan p
 const h=(A.go('home'),document.getElementById('app').innerHTML);console.assert(h.includes('class="ring"')&&!h.includes('Gym</span>'),'home ring ohne labels');
 A.toggleMenu();console.assert(document.getElementById('menu').hidden===false,'menu auf');A.go('gym');console.assert(document.getElementById('menu').hidden===true,'menu zu nach go');
 // Alle Screens rendern ohne Fehler
-for(const s of ['home','gym','run','stretch','history','settings','calendar'])A.go(s);
+for(const s of ['home','gym','run','stretch','history','settings','calendar','stats'])A.go(s);
 A.go('gymEdit',0);A.go('stretchEdit',0);
 console.log(failed?`FAILED: ${failed}`:'ALL OK');process.exit(failed?1:0);

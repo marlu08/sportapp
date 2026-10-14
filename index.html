@@ -56,6 +56,7 @@ input[type=checkbox]{width:24px;height:24px;vertical-align:middle;margin-right:8
   <button onclick="go('stretch')">🧘 Dehnen</button>
   <button onclick="go('calendar')">📅 Kalender</button>
   <button onclick="go('history')">📋 Verlauf</button>
+  <button onclick="go('stats')">📊 Statistik</button>
   <button onclick="go('settings')">⚙️ Einstellungen</button>
 </div>
 <div id="app"></div>
@@ -110,7 +111,7 @@ function render(){
   if(S.screen==='stretchRun'&&!S.sr)S.screen='stretch';
   if(S.screen==='gymEdit'&&!S.gymPlans[S.edit])S.screen='gym';
   if(S.screen==='stretchEdit'&&!S.stretchRoutines[S.edit])S.screen='stretch';
-  const R={home,gym,gymEdit,workout,run,stretch,stretchEdit,stretchRun,history,settings,calendar};
+  const R={home,gym,gymEdit,workout,run,stretch,stretchEdit,stretchRun,history,settings,calendar,stats};
   document.getElementById('app').innerHTML=(R[S.screen]||home)();
   renderBar();
 }
@@ -209,9 +210,10 @@ function logSet(gi,ei,vi){
 }
 function delSet(gi,ei,vi,si){S.activeWorkout.sets[varKey(gi,ei,vi)].splice(si,1);save();render()}
 function finishWorkout(){
-  const w=S.activeWorkout;
+  const w=S.activeWorkout,sets=[];
+  w.plan.groups.forEach(g=>g.exercises.forEach(e=>e.variants.forEach(v=>(w.sets[vk(e.name,v)]||[]).forEach(x=>sets.push({g:g.name,e:e.name,v,kg:x.kg,reps:x.reps})))));
   Object.entries(w.sets).forEach(([k,s])=>{if(s.length)S.lastSets[k]=s});
-  S.log.push({type:'gym',date:today(),name:w.plan.name});
+  S.log.push({type:'gym',date:today(),name:w.plan.name,sets});
   S.activeWorkout=null;S.rest=null;go('home');
 }
 function cancelWorkout(){if(confirm('Workout verwerfen?')){S.activeWorkout=null;S.rest=null;go('gym')}}
@@ -315,6 +317,38 @@ function history(){
   const ic=ICON;
   const l=S.log.map((e,i)=>({...e,i})).reverse().slice(0,100);
   return hdr('Verlauf','home')+(l.length?l.map(e=>`<div class="card row"><span class="mut" style="flex:0 0 60px">${e.date.slice(8)}.${e.date.slice(5,7)}.</span><span>${ic[e.type]} ${esc(e.name)}${e.min?' · '+e.min+' min':''}</span><button class="s d" style="flex:0" onclick="delLog(${e.i})">✕</button></div>`).join(''):'<p class="mut">Noch nichts geloggt.</p>');
+}
+// ===== Statistik =====
+const score=x=>x.kg?x.kg*(1+x.reps/30):x.reps; // Epley-1RM; ohne Gewicht zählen Wdh
+function strength(){
+  // pro Workout & Muskelgruppe: Ø über Übungen von (Bestsatz / erster Bestsatz dieser Übung·Variante) in %
+  // ponytail: neue Übung startet bei 100 % und zieht den Gruppenschnitt Richtung 100; reicht für den Trend
+  const first={},grp={};
+  S.log.filter(l=>l.sets).forEach(l=>{const best={},g={},pts={};
+    l.sets.forEach(x=>{const k=vk(x.e,x.v);best[k]=Math.max(best[k]||0,score(x));g[k]=x.g});
+    Object.entries(best).forEach(([k,b])=>{first[k]=first[k]||b;(pts[g[k]]=pts[g[k]]||[]).push(b/first[k]*100)});
+    Object.entries(pts).forEach(([gn,a])=>(grp[gn]=grp[gn]||[]).push({d:l.date,v:a.reduce((s,x)=>s+x,0)/a.length}))});
+  return grp;
+}
+function chart(p){
+  const W=300,H=90,vs=p.map(x=>x.v),lo=Math.min(100,...vs)-5,hi=Math.max(100,...vs)+5;
+  const X=i=>p.length<2?W/2:i/(p.length-1)*W,Y=v=>H-(v-lo)/(hi-lo)*H;
+  return `<svg viewBox="-6 -6 ${W+12} ${H+12}" style="width:100%;height:auto;margin-top:8px">
+    <line x1="0" x2="${W}" y1="${Y(100)}" y2="${Y(100)}" stroke="#444" stroke-dasharray="4 4"/>
+    <polyline fill="none" stroke="#eee" stroke-width="2" stroke-linejoin="round" points="${p.map((x,i)=>X(i)+','+Y(x.v)).join(' ')}"/>
+    ${p.map((x,i)=>`<circle cx="${X(i)}" cy="${Y(x.v)}" r="4" fill="#eee"/>`).join('')}</svg>
+    <div class="row mut"><span>${p[0].d.slice(8)}.${p[0].d.slice(5,7)}.</span><span style="text-align:right">${p.at(-1).d.slice(8)}.${p.at(-1).d.slice(5,7)}.</span></div>`;
+}
+function stats(){
+  const cnt={};S.gymPlans.forEach(p=>p.groups.forEach(g=>g.exercises.forEach(e=>cnt[e.name]=0)));
+  S.log.forEach(l=>(l.sets||[]).forEach(x=>cnt[x.e]=(cnt[x.e]||0)+1));
+  const list=Object.entries(cnt).sort((a,b)=>b[1]-a[1]),max=list[0]?.[1]||1,grp=Object.entries(strength());
+  return hdr('Statistik','home')+`<h2 style="font-size:18px">Sätze pro Übung</h2>
+  <div class="card">${list.map(([n,c])=>`<div class="day"><span style="flex:1">${esc(n)}</span><span class="mut">${c}</span></div>
+    <div style="height:4px;border-radius:2px;background:#666;width:${c/max*100}%;margin-bottom:4px"></div>`).join('')||'<span class="mut">Keine Übungen</span>'}</div>
+  <h2 style="font-size:18px;margin-top:24px">Kraft nach Muskelgruppe</h2>
+  <p class="mut">Bester Satz (geschätztes 1RM) im Vergleich zum ersten Mal = 100 %.</p>
+  ${grp.length?grp.map(([g,p])=>{const d=Math.round(p.at(-1).v-100);return `<div class="card"><div class="row"><b>${esc(g)}</b><span style="text-align:right">${d>0?'↑ +':d<0?'↓ ':'→ '}${d} %</span></div>${chart(p)}</div>`}).join(''):'<p class="mut">Noch keine Workouts mit Sätzen gespeichert.</p>'}`;
 }
 function delLog(i){S.log.splice(i,1);save();render()}
 function settings(){
