@@ -10,9 +10,9 @@ Persönlicher Trainings-Tracker für Marcel (Gym, Laufen, Dehnen) als PWA. UI au
 ## Datenmodell (localStorage, Key `sportapp`, Objekt `S`)
 - `gymPlans[]` → `groups[]` (Muskelgruppe) → `exercises[]` `{name, variants[]}` (z.B. Schrägbankdrücken → Langhantel, Kurzhantel, Maschine, Smith Machine)
 - `lastSets` keyed `"Übung · Variante"` → letzte Sätze `[{kg,reps}]`
-- `activeWorkout {plan (Kopie), sets}`, `rest {end|left}`, `restSec`, `sr` (laufende Dehnroutine)
+- `activeWorkout {plan (Kopie), sets, date?}` (date = einstellbarer Workout-Tag, Default heute), `rest {end|left}`, `restSec`, `sr` (laufende Dehnroutine)
 - `runPlans[]`, `stretchRoutines[] {steps[{name,seconds}]}`, `plan{ 'YYYY-MM-DD': [{type,name}] }` (Kalender), `log[] {type,date,name}` (Monatszähler); Gym-Einträge zusätzlich `sets[{g,e,v,kg,reps}]` (g=Muskelgruppe, e=Übung, v=Variante) → Quelle für Statistik. Einträge vor Okt 2026 haben kein `sets`, darum immer `l.sets||[]`.
-- Statistik (`stats()`): Sätze pro Übung (inkl. 0 für Planübungen) + Kraft pro Muskelgruppe: Dropdown wählt Übung·Variante (`statSel`, nicht gespeichert), Linie = Ø aller Sätze pro Workout (Epley-1RM, ohne kg = Wdh) relativ zum ersten Mal (100 %), dazu schwerster Satz. Workout-Datum (`activeWorkout.date`) ist im Workout einstellbar.
+- Statistik (`stats()`): Sätze pro Übung (inkl. 0 für Planübungen) + Kraft pro Muskelgruppe: Dropdown wählt Übung·Variante (`statSel`, nicht gespeichert), Linie = Ø aller Sätze pro Workout (Epley-1RM, ohne kg = Wdh) relativ zum ersten Mal (100 %), dazu schwerster Satz.
 - `screen` + `edit` werden mitgespeichert → Reload landet auf derselben Seite.
 - Strukturänderung am Datenmodell: in `load()` migrieren (aktuell: alte String-Übungen → Pläne auf Default zurücksetzen).
 
@@ -26,3 +26,7 @@ Persönlicher Trainings-Tracker für Marcel (Gym, Laufen, Dehnen) als PWA. UI au
 - Repo: https://github.com/marlu08/sportapp (public). Push auf `main` = Deploy.
 - GitHub Pages: https://marlu08.github.io/sportapp/ (Source: branch main, root). Einmalig in den Repo-Settings aktivieren.
 - Lokal testen: `open index.html` (Safari Responsive Design Mode, 390px). Der gstack-Browse-Daemon stirbt auf diesem Mac mit Exit 137, daher `test.js` statt Screenshots.
+
+## Offen (angesprochen, noch nicht gebaut)
+- Verlauf ist nach Eingabe-Reihenfolge sortiert, nicht nach Datum → nachgetragene Workouts stehen oben.
+- Nachgetragenes älteres Workout überschreibt `lastSets` („Letztes Mal“) – sollte nur, wenn es das neueste ist.
