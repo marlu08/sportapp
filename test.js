@@ -32,10 +32,12 @@ A.finishWorkout();
 console.assert(A.S.lastSets[K][0].kg===100,'lastSets');
 console.assert(A.S.log[0].sets.length===1&&A.S.log[0].sets[0].g==='Beine'&&A.S.log[0].sets[0].e==='Kniebeuge','sets im log');
 // Statistik: 2. Workout mit mehr Gewicht -> Beine steigen
-A.startWorkout(0);document.getElementById('kg0-0-0').value='110';A.logSet(0,0,0);A.logSet(0,0,0);A.finishWorkout();
-const st=A.strength().Beine;console.assert(st.length===2&&st[0].v===100&&Math.round(st[1].v)===110,'kraft % '+JSON.stringify(st));
-const sh=A.stats();console.assert(sh.includes('↑ +10 %')&&sh.includes('<svg')&&sh.indexOf('Kniebeuge')<sh.indexOf('Kreuzheben'),'stats screen');
-A.S.log.splice(1,1);console.assert(A.S.log.length===1&&A.S.screen==='home','log+home');
+// Workout 2: 110×5 + 90×5 -> Ø 100×5 = gleich wie Workout 1 (100×5); Workout 3: 3× 110×5 -> +10 %
+A.startWorkout(0);document.getElementById('kg0-0-0').value='110';A.logSet(0,0,0);document.getElementById('kg0-0-0').value='90';A.logSet(0,0,0);A.finishWorkout();
+A.startWorkout(0);document.getElementById('kg0-0-0').value='110';A.logSet(0,0,0);A.logSet(0,0,0);A.logSet(0,0,0);A.finishWorkout();
+const st=A.strength().Beine;console.assert(st.length===3&&st[0].v===100&&Math.round(st[1].v)===100&&Math.round(st[2].v)===110,'kraft Ø % '+JSON.stringify(st));
+const sh=A.stats();console.assert(sh.includes('↑ +10 %')&&sh.includes('<svg')&&sh.indexOf('Kniebeuge')<sh.indexOf('Kreuzheben')&&sh.includes('Max 110 kg × 5'),'stats screen');
+A.S.log.splice(1,2);console.assert(A.S.log.length===1&&A.S.screen==='home','log+home');
 A.startWorkout(1);console.assert(document.getElementById('app').innerHTML.includes('Smith Machine'),'Push Varianten sichtbar');A.S.activeWorkout=null;
 // Plan-Editor
 A.newPlan();A.addGroup();A.addEx(0,'__new');A.addEx(0,'Kniebeuge');

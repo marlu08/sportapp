@@ -321,12 +321,12 @@ function history(){
 // ===== Statistik =====
 const score=x=>x.kg?x.kg*(1+x.reps/30):x.reps; // Epley-1RM; ohne Gewicht zählen Wdh
 function strength(){
-  // pro Workout & Muskelgruppe: Ø über Übungen von (Bestsatz / erster Bestsatz dieser Übung·Variante) in %
+  // pro Workout & Muskelgruppe: Ø über Übungen von (Ø aller Sätze / Ø beim ersten Mal dieser Übung·Variante) in %
   // ponytail: neue Übung startet bei 100 % und zieht den Gruppenschnitt Richtung 100; reicht für den Trend
   const first={},grp={};
-  S.log.filter(l=>l.sets).forEach(l=>{const best={},g={},pts={};
-    l.sets.forEach(x=>{const k=vk(x.e,x.v);best[k]=Math.max(best[k]||0,score(x));g[k]=x.g});
-    Object.entries(best).forEach(([k,b])=>{first[k]=first[k]||b;(pts[g[k]]=pts[g[k]]||[]).push(b/first[k]*100)});
+  S.log.filter(l=>l.sets).forEach(l=>{const sc={},g={},pts={};
+    l.sets.forEach(x=>{const k=vk(x.e,x.v);(sc[k]=sc[k]||[]).push(score(x));g[k]=x.g});
+    Object.entries(sc).forEach(([k,a])=>{const b=a.reduce((s,x)=>s+x,0)/a.length;first[k]=first[k]||b;(pts[g[k]]=pts[g[k]]||[]).push(b/first[k]*100)});
     Object.entries(pts).forEach(([gn,a])=>(grp[gn]=grp[gn]||[]).push({d:l.date,v:a.reduce((s,x)=>s+x,0)/a.length}))});
   return grp;
 }
@@ -342,13 +342,15 @@ function chart(p){
 function stats(){
   const cnt={};S.gymPlans.forEach(p=>p.groups.forEach(g=>g.exercises.forEach(e=>cnt[e.name]=0)));
   S.log.forEach(l=>(l.sets||[]).forEach(x=>cnt[x.e]=(cnt[x.e]||0)+1));
+  const mx={};S.log.forEach(l=>(l.sets||[]).forEach(x=>{const m=mx[x.g]=mx[x.g]||{},k=vk(x.e,x.v),o=m[k];if(!o||x.kg>o.kg||x.kg===o.kg&&x.reps>o.reps)m[k]=x}));
   const list=Object.entries(cnt).sort((a,b)=>b[1]-a[1]),max=list[0]?.[1]||1,grp=Object.entries(strength());
   return hdr('Statistik','home')+`<h2 style="font-size:18px">Sätze pro Übung</h2>
   <div class="card">${list.map(([n,c])=>`<div class="day"><span style="flex:1">${esc(n)}</span><span class="mut">${c}</span></div>
     <div style="height:4px;border-radius:2px;background:#666;width:${c/max*100}%;margin-bottom:4px"></div>`).join('')||'<span class="mut">Keine Übungen</span>'}</div>
   <h2 style="font-size:18px;margin-top:24px">Kraft nach Muskelgruppe</h2>
-  <p class="mut">Bester Satz (geschätztes 1RM) im Vergleich zum ersten Mal = 100 %.</p>
-  ${grp.length?grp.map(([g,p])=>{const d=Math.round(p.at(-1).v-100);return `<div class="card"><div class="row"><b>${esc(g)}</b><span style="text-align:right">${d>0?'↑ +':d<0?'↓ ':'→ '}${d} %</span></div>${chart(p)}</div>`}).join(''):'<p class="mut">Noch keine Workouts mit Sätzen gespeichert.</p>'}`;
+  <p class="mut">Ø aller Sätze (geschätztes 1RM) im Vergleich zum ersten Mal = 100 %.</p>
+  ${grp.length?grp.map(([g,p])=>{const d=Math.round(p.at(-1).v-100);return `<div class="card"><div class="row"><b>${esc(g)}</b><span style="text-align:right">${d>0?'↑ +':d<0?'↓ ':'→ '}${d} %</span></div>${chart(p)}
+    ${Object.entries(mx[g]||{}).map(([k,x])=>`<div class="day"><span style="flex:1">${esc(k)}</span><span class="mut">Max ${x.kg?x.kg+' kg × '+x.reps:x.reps+' Wdh'}</span></div>`).join('')}</div>`}).join(''):'<p class="mut">Noch keine Workouts mit Sätzen gespeichert.</p>'}`;
 }
 function delLog(i){S.log.splice(i,1);save();render()}
 function settings(){
