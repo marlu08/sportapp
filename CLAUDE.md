@@ -11,7 +11,8 @@ Persönlicher Trainings-Tracker für Marcel (Gym, Laufen, Dehnen) als PWA. UI au
 - `gymPlans[]` → `groups[]` (Muskelgruppe) → `exercises[]` `{name, variants[]}` (z.B. Schrägbankdrücken → Langhantel, Kurzhantel, Maschine, Smith Machine)
 - `lastSets` keyed `"Übung · Variante"` → letzte Sätze `[{kg,reps}]`
 - `activeWorkout {plan (Kopie), sets}`, `rest {end|left}`, `restSec`, `sr` (laufende Dehnroutine)
-- `runPlans[]`, `stretchRoutines[] {steps[{name,seconds}]}`, `plan{ 'YYYY-MM-DD': [{type,name}] }` (Kalender), `log[] {type,date,name}` (Monatszähler)
+- `runPlans[]`, `stretchRoutines[] {steps[{name,seconds}]}`, `plan{ 'YYYY-MM-DD': [{type,name}] }` (Kalender), `log[] {type,date,name}` (Monatszähler); Gym-Einträge zusätzlich `sets[{g,e,v,kg,reps}]` (g=Muskelgruppe, e=Übung, v=Variante) → Quelle für Statistik. Einträge vor Okt 2026 haben kein `sets`, darum immer `l.sets||[]`.
+- Statistik (`stats()`): Sätze pro Übung (inkl. 0 für Planübungen) + Kraft pro Muskelgruppe = Ø über Übung·Variante von bestem Satz (Epley-1RM, ohne kg = Wdh) relativ zum ersten Mal (100 %), als SVG-Linie.
 - `screen` + `edit` werden mitgespeichert → Reload landet auf derselben Seite.
 - Strukturänderung am Datenmodell: in `load()` migrieren (aktuell: alte String-Übungen → Pläne auf Default zurücksetzen).
 
